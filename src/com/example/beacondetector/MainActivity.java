@@ -1,15 +1,22 @@
 package com.example.beacondetector;
 
-import android.os.Bundle;
 import android.app.Activity;
+import android.os.Bundle;
 import android.view.Menu;
 
 public class MainActivity extends Activity {
+	BLEManager mBLEManager = null;
+	
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
+		
+		mBLEManager = new BLEManager(this);
+		
+		mBLEManager.startScanner();
+		
 	}
 
 	@Override
@@ -18,5 +25,7 @@ public class MainActivity extends Activity {
 		getMenuInflater().inflate(R.menu.main, menu);
 		return true;
 	}
+	
+	
 
 }

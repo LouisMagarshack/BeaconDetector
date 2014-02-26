@@ -4,9 +4,15 @@
     android:versionCode="1"
     android:versionName="1.0" >
 
+    <!-- Allows us to use the Bluetooth Antenna. Admin is needed to perform scans -->
+    <uses-permission android:name="android.permission.BLUETOOTH"/>
+	<uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+	
+	<uses-feature android:name="android.hardware.bluetooth_le" android:required="false"/>
+    
     <uses-sdk
-        android:minSdkVersion="18"
-        android:targetSdkVersion="18" />
+        android:minSdkVersion="11"
+        android:targetSdkVersion="19" />
 
     <application
         android:allowBackup="true"
