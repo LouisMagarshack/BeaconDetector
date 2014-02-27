@@ -2,14 +2,17 @@ package com.example.beacondetector;
 
 import org.joda.time.DateTime;
 
+import android.annotation.TargetApi;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Handler;
 import android.util.Log;
 
+@TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR2)
 public class BLEManager {
 	
 	
@@ -21,9 +24,9 @@ public class BLEManager {
 	
 	private final DateTime END_RUSH = new DateTime(2014, 02, 26, 14, 0);
 	
-	private final int SCAN_INTERVAL = 1000 * 60 * 10; //10 minutes
+	private final int SCAN_INTERVAL = 1000 /* 60 */ * 10; //10 minutes
 	
-	private final int SCAN_DURATION = 1000 * 10; //10 seconds
+	private final int SCAN_DURATION = 1000 * 100; //10 seconds
 	
 	private Handler mScanJobHandler;
 	
@@ -31,10 +34,15 @@ public class BLEManager {
 	
 	private boolean mBLESupported = false;
 	
+	//TODO DEBUGGING, REMOVE
+	private final MainActivity mUI;
+	
 	private final BluetoothManager mBluetoothManager;
 	private final BluetoothAdapter mBluetoothAdapter;
 	
 	public BLEManager(Context ctx) {
+		mUI = (MainActivity) ctx;
+		
 		mScanJobHandler = new Handler();
 		mScanHandler = new Handler();
 		mBluetoothManager = !bleSupported(ctx) ? null : 
@@ -43,8 +51,14 @@ public class BLEManager {
 	}
 	
 	private boolean bleSupported(Context ctx) {
-		mBLESupported =  ctx == null ? false : ctx.getPackageManager().hasSystemFeature(
-				PackageManager.FEATURE_BLUETOOTH_LE);
+		mBLESupported =  true/*(ctx == null ? false : ctx.getPackageManager().hasSystemFeature(
+				PackageManager.FEATURE_BLUETOOTH_LE))*/; 
+		
+//		if (mBLESupported) {
+//			mUI.showToast("BLE is supported.");
+//		} else {
+//			mUI.showToast("BLE is not supported.");
+//		}
 		return mBLESupported;
 	}
 	
@@ -65,9 +79,13 @@ public class BLEManager {
 	}
 	
 	private void performScan() {
+		if (!mBluetoothAdapter.isEnabled()) {
+			
+		}
 		if (mBluetoothAdapter == null || !mBluetoothAdapter.isEnabled()) {
 //			Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
 //		    startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
+			
 			return;
 		}
 		mScanHandler.postDelayed(new Runnable() {
@@ -79,6 +97,7 @@ public class BLEManager {
         }, SCAN_DURATION);
 
 //        mScanning = true;
+		
         mBluetoothAdapter.startLeScan(mLeScanCallback);
 		
 		
@@ -112,35 +131,39 @@ public class BLEManager {
 	    	DateTime now = DateTime.now();
 	    	int weekDay = now.getDayOfWeek();
 	    	long nextInterval = SCAN_INTERVAL;
-	    	if (weekDay != SUNDAY) {
-	    		if (duringRushHour(now)) {
-	    			//We are during rush hour
-	    			performScan();
-	    		} else if (beforeRushHour(now)) {
-	    			nextInterval = Math.abs(BEGIN_RUSH.getMillisOfDay() - now.getMillisOfDay());
-
-	    		} else if (afterRushHour(now)) {
-	    			// set the date to the beginning of rush hour next day or in 2 days if it's saturday
-	    			DateTime future =  DateTime.now();
-	    			future = future.plusDays(future.getDayOfWeek() == SATURDAY ? 2 : 1);
-	    			future = future.withHourOfDay(BEGIN_RUSH.getHourOfDay());
-	    			future = future.withMinuteOfHour(BEGIN_RUSH.getMinuteOfHour());
-	    			future = future.withSecondOfMinute(BEGIN_RUSH.getSecondOfMinute());
-	    			
-	    			nextInterval = Math.abs(future.getMillis() - now.getMillis());
-	    		}
-	    	} else {
-	    		// set the date to the beginning of rush hour next day
-	    		
-	    		DateTime future =  DateTime.now();
-    			future = future.plusDays(1);
-    			future = future.withHourOfDay(BEGIN_RUSH.getHourOfDay());
-    			future = future.withMinuteOfHour(BEGIN_RUSH.getMinuteOfHour());
-    			future = future.withSecondOfMinute(BEGIN_RUSH.getSecondOfMinute());
-    			
-    			nextInterval = Math.abs(future.getMillis() - now.getMillis());
-	    	}
+//	    	if (weekDay != SUNDAY) {
+//	    		if (duringRushHour(now)) {
+//	    			//We are during rush hour
+//	    			performScan();
+//	    		} else if (beforeRushHour(now)) {
+//	    			nextInterval = Math.abs(BEGIN_RUSH.getMillisOfDay() - now.getMillisOfDay());
+//
+//	    		} else if (afterRushHour(now)) {
+//	    			// set the date to the beginning of rush hour next day or in 2 days if it's saturday
+//	    			DateTime future =  DateTime.now();
+//	    			future = future.plusDays(future.getDayOfWeek() == SATURDAY ? 2 : 1);
+//	    			future = future.withHourOfDay(BEGIN_RUSH.getHourOfDay());
+//	    			future = future.withMinuteOfHour(BEGIN_RUSH.getMinuteOfHour());
+//	    			future = future.withSecondOfMinute(BEGIN_RUSH.getSecondOfMinute());
+//	    			
+//	    			nextInterval = Math.abs(future.getMillis() - now.getMillis());
+//	    		}
+//	    	} else {
+//	    		// set the date to the beginning of rush hour next day
+//	    		
+//	    		DateTime future =  DateTime.now();
+//    			future = future.plusDays(1);
+//    			future = future.withHourOfDay(BEGIN_RUSH.getHourOfDay());
+//    			future = future.withMinuteOfHour(BEGIN_RUSH.getMinuteOfHour());
+//    			future = future.withSecondOfMinute(BEGIN_RUSH.getSecondOfMinute());
+//    			
+//    			nextInterval = Math.abs(future.getMillis() - now.getMillis());
+//	    	}
 	    	
+	    	
+	    	//TODO this is for debugging
+	    	
+	    	performScan();
 	    	mScanJobHandler.postDelayed(mScanScheduler, nextInterval);
 	    }
 	  };
@@ -157,6 +180,7 @@ public class BLEManager {
     	          @Override
     	          public void run() {
     	              Log.d("BLEManager DEBUG", "received name = " + device.getName());
+    	              mUI.updateList(device);
     	          }
     	      };
     	      mScanner.run();
