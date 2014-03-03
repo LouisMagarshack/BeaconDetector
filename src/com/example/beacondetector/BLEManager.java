@@ -14,6 +14,13 @@ import android.util.Log;
 
 @TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR2)
 public class BLEManager {
+	/*
+	 * before rush = [midnight; BEGIN_RUSH[
+	 * during rush = [BEGIN_RUSH; END_RUSH[
+	 * after rush = [END_RUSH; midnight[
+	 * Sunday is a particular case: no rush on sundays
+	 * 
+	 */
 	
 	
 	private final int SATURDAY = 6;
@@ -26,7 +33,7 @@ public class BLEManager {
 	
 	private final int SCAN_INTERVAL = 1000 /* 60 */ * 10; //10 minutes
 	
-	private final int SCAN_DURATION = 1000 * 100; //10 seconds
+	private final int SCAN_DURATION = 1000 * 10; //10 seconds
 	
 	private Handler mScanJobHandler;
 	
@@ -51,14 +58,14 @@ public class BLEManager {
 	}
 	
 	private boolean bleSupported(Context ctx) {
-		mBLESupported =  true/*(ctx == null ? false : ctx.getPackageManager().hasSystemFeature(
-				PackageManager.FEATURE_BLUETOOTH_LE))*/; 
+		mBLESupported =  (ctx == null ? false : ctx.getPackageManager().hasSystemFeature(
+				PackageManager.FEATURE_BLUETOOTH_LE)); 
 		
-//		if (mBLESupported) {
-//			mUI.showToast("BLE is supported.");
-//		} else {
-//			mUI.showToast("BLE is not supported.");
-//		}
+		if (mBLESupported) {
+			mUI.showToast("BLE is supported.");
+		} else {
+			mUI.showToast("BLE is not supported.");
+		}
 		return mBLESupported;
 	}
 	
@@ -79,24 +86,19 @@ public class BLEManager {
 	}
 	
 	private void performScan() {
-		if (!mBluetoothAdapter.isEnabled()) {
-			
-		}
 		if (mBluetoothAdapter == null || !mBluetoothAdapter.isEnabled()) {
+			//Should we ask the user to enable BT?
 //			Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
 //		    startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
-			
+			Log.d("BLEManager DEBUG", "BT is turned off");
 			return;
 		}
 		mScanHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
-//                mScanning = false;
                 mBluetoothAdapter.stopLeScan(mLeScanCallback);
             }
         }, SCAN_DURATION);
-
-//        mScanning = true;
 		
         mBluetoothAdapter.startLeScan(mLeScanCallback);
 		
@@ -124,47 +126,78 @@ public class BLEManager {
 					minutes >= END_RUSH.getMinuteOfHour());
 	}
 	
+	private long durationToNextRushMilis() throws SchedulerException {
+		DateTime now = DateTime.now();
+    	int weekDay = now.getDayOfWeek();
+    	
+    	//Next rush is monday
+    	if (weekDay == SUNDAY) {
+    		DateTime future =  DateTime.now();
+			future = future.plusDays(1);
+			future = future.withHourOfDay(BEGIN_RUSH.getHourOfDay());
+			future = future.withMinuteOfHour(BEGIN_RUSH.getMinuteOfHour());
+			future = future.withSecondOfMinute(BEGIN_RUSH.getSecondOfMinute());
+			
+			return Math.abs(future.getMillis() - now.getMillis());
+    	}
+    	
+    	//Next rush in the same day
+    	if (beforeRushHour(now)) {
+    		return Math.abs(BEGIN_RUSH.getMillisOfDay() - now.getMillisOfDay());
+    	}
+    	
+    	//During rush, fast schedule
+    	if (duringRushHour(now)) {
+    		return SCAN_INTERVAL;
+    	}
+    	
+    	//Next rush is the next day or in 2 days
+    	if (afterRushHour(now)) {
+    		DateTime future =  DateTime.now();
+			future = future.plusDays(future.getDayOfWeek() == SATURDAY ? 2 : 1);
+			future = future.withHourOfDay(BEGIN_RUSH.getHourOfDay());
+			future = future.withMinuteOfHour(BEGIN_RUSH.getMinuteOfHour());
+			future = future.withSecondOfMinute(BEGIN_RUSH.getSecondOfMinute());
+			
+			return Math.abs(future.getMillis() - now.getMillis());
+    	}
+    	
+    	//Should not happen if intervals are set correctly
+    	throw new SchedulerException("Failed to find a time for the next scan attempt");
+    	
+	}
+	
+	private void scheduleNextScan() {
+		
+		
+		try {
+			mScanJobHandler.postDelayed(mScanScheduler, durationToNextRushMilis());
+		} catch (SchedulerException e) {
+			Log.d("BLEManager DEBUG", "the scheduler did not schedule" +
+					" the next scan correctly. Set to default value instead (" + SCAN_INTERVAL + ")");
+			mScanJobHandler.postDelayed(mScanScheduler, SCAN_INTERVAL);
+		}
+		
+		
+	}
 	
 	private Runnable mScanScheduler = new Runnable() {
 	    @Override 
 	    public void run() {
 	    	DateTime now = DateTime.now();
 	    	int weekDay = now.getDayOfWeek();
-	    	long nextInterval = SCAN_INTERVAL;
-//	    	if (weekDay != SUNDAY) {
-//	    		if (duringRushHour(now)) {
-//	    			//We are during rush hour
-//	    			performScan();
-//	    		} else if (beforeRushHour(now)) {
-//	    			nextInterval = Math.abs(BEGIN_RUSH.getMillisOfDay() - now.getMillisOfDay());
-//
-//	    		} else if (afterRushHour(now)) {
-//	    			// set the date to the beginning of rush hour next day or in 2 days if it's saturday
-//	    			DateTime future =  DateTime.now();
-//	    			future = future.plusDays(future.getDayOfWeek() == SATURDAY ? 2 : 1);
-//	    			future = future.withHourOfDay(BEGIN_RUSH.getHourOfDay());
-//	    			future = future.withMinuteOfHour(BEGIN_RUSH.getMinuteOfHour());
-//	    			future = future.withSecondOfMinute(BEGIN_RUSH.getSecondOfMinute());
-//	    			
-//	    			nextInterval = Math.abs(future.getMillis() - now.getMillis());
-//	    		}
-//	    	} else {
-//	    		// set the date to the beginning of rush hour next day
-//	    		
-//	    		DateTime future =  DateTime.now();
-//    			future = future.plusDays(1);
-//    			future = future.withHourOfDay(BEGIN_RUSH.getHourOfDay());
-//    			future = future.withMinuteOfHour(BEGIN_RUSH.getMinuteOfHour());
-//    			future = future.withSecondOfMinute(BEGIN_RUSH.getSecondOfMinute());
-//    			
-//    			nextInterval = Math.abs(future.getMillis() - now.getMillis());
-//	    	}
+	    	
+	    	if (weekDay != SUNDAY && duringRushHour(now)) {
+	    		performScan();
+	    	}
+	    	
+	    	scheduleNextScan();
 	    	
 	    	
 	    	//TODO this is for debugging
+//	    	performScan();
 	    	
-	    	performScan();
-	    	mScanJobHandler.postDelayed(mScanScheduler, nextInterval);
+	    	
 	    }
 	  };
 	  
@@ -189,3 +222,4 @@ public class BLEManager {
 
 
 }
+
