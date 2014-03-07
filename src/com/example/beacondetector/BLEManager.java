@@ -212,6 +212,7 @@ public class BLEManager {
     		  mScanner = new Runnable() {
     	          @Override
     	          public void run() {
+    	        	  //TODO send the received name to the server.
     	              Log.d("BLEManager DEBUG", "received name = " + device.getName());
     	              mUI.updateList(device);
     	          }

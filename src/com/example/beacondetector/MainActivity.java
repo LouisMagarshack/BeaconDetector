@@ -2,7 +2,6 @@ package com.example.beacondetector;
 
 import android.app.Activity;
 import android.bluetooth.BluetoothDevice;
-import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.view.Menu;
 import android.widget.TextView;
@@ -25,12 +24,21 @@ public class MainActivity extends Activity {
 //		}
 		
 		
-		
+		//This should not be in an Activity as it's lifecyle is not stable.
+		//It should be put in a configuration wrapper such as a class extending
+		//Application
 		mBLEManager = new BLEManager(this);
 		
 		mBLEManager.startScanner();
 		
+		
 	}
+	
+//	@Override
+//	protected void onResume() {
+//		super.onResume();
+//		
+//	}
 
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
