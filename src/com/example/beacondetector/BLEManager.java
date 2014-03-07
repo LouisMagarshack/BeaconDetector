@@ -16,6 +16,7 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Handler;
+import android.provider.CallLog.Calls;
 import android.util.Log;
 
 @TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR2)
@@ -39,64 +40,76 @@ public class BLEManager {
 	//Need an ArrayList for random accesses.
 	private ArrayList<ScanInterval> mIntervals;
 	
-	private ScanInterval mCurrentInterval;
+//	private ScanInterval mCurrentInterval;
 	
 //	private final DateTime BEGIN_RUSH = new DateTime(2014, 02, 26, 11, 30);
 //	
 //	private final DateTime END_RUSH = new DateTime(2014, 02, 26, 14, 0);
 	
-	private final int SCAN_INTERVAL = 1000 /* 60 */ * 10; //10 minutes
+//	private final int SCAN_INTERVAL = 1000 /* 60 */ * 10; //10 minutes
 	
 	private final int SCAN_DURATION = 1000 * 10; //10 seconds
 	
-	private Handler mScanJobHandler;
+//	private Handler mScanJobHandler = new Handler();
 	
-	private Handler mScanHandler;
+	private Handler mScanHandler = new Handler();
 	
 	private boolean mBLESupported = false;
 	
 	//TODO DEBUGGING, REMOVE
-	private final MainActivity mUI;
+//	private final MainActivity mUI;
 	
 	private final BluetoothManager mBluetoothManager;
 	private final BluetoothAdapter mBluetoothAdapter;
 	
-	public BLEManager(Context ctx, ArrayList<ScanInterval> intervals) {
-		mUI = (MainActivity) ctx;
-		
-		mIntervals = intervals;
-		sortScans();
-		
-		mScanJobHandler = new Handler();
-		mScanHandler = new Handler();
+	private boolean mScanning = false;
+	
+//	private BLEManager() {
+//		mBluetoothManager = null;
+//		mBluetoothAdapter = null;
+//		
+//		//TODO init with global ctx
+////		mBluetoothManager = !bleSupported(ctx) ? null : 
+////			(BluetoothManager) ctx.getSystemService(Context.BLUETOOTH_SERVICE);
+////		
+////		mBluetoothAdapter = mBluetoothManager == null ? null : mBluetoothManager.getAdapter();
+//	}
+	
+//	private static class BLEManagerHolder {
+//		private static final BLEManager INSTANCE = new BLEManager();
+//	}
+	
+//	public static BLEManager getInstance() {
+//		return BLEManagerHolder.INSTANCE;
+//	}
+	
+	public BLEManager(Context ctx) {
 		
 		mBluetoothManager = !bleSupported(ctx) ? null : 
 			(BluetoothManager) ctx.getSystemService(Context.BLUETOOTH_SERVICE);
-		
+
 		mBluetoothAdapter = mBluetoothManager == null ? null : mBluetoothManager.getAdapter();
-	}
-	
-	public BLEManager(Context ctx) {
-		this(ctx, new ArrayList<ScanInterval>());
+		
 	}
 	
 	private boolean bleSupported(Context ctx) {
 		mBLESupported =  (ctx == null ? false : ctx.getPackageManager().hasSystemFeature(
 				PackageManager.FEATURE_BLUETOOTH_LE)); 
 		
-		if (mBLESupported) {
-			mUI.showToast("BLE is supported.");
-		} else {
-			mUI.showToast("BLE is not supported.");
-		}
+//		if (mBLESupported) {
+//			mUI.showToast("BLE is supported.");
+//		} else {
+//			mUI.showToast("BLE is not supported.");
+//		}
 		return mBLESupported;
 	}
 	
 	
 	public void stopScanner() {
 		try {
-			mScanHandler.removeCallbacks(mScanner);
-			mScanJobHandler.removeCallbacks(mScanScheduler);
+			mScanHandler.removeCallbacks(mCallbackCaller);
+			mScanning = false;
+//			mScanJobHandler.removeCallbacks(mScanScheduler);
 		} catch (NullPointerException e) {
 			//nothing special to do, it just means that mScanner was not initialized.
 		}
@@ -105,25 +118,37 @@ public class BLEManager {
 	public void startScanner() {
 		if (mBLESupported) {			
 			mScanScheduler.run();
+			mScanning = true;
 		}
 	}
 	
-	public void removeIntervalsByPlugin(String pluginName) {
-		Iterator<ScanInterval> iter = mIntervals.iterator();
-		while(iter.hasNext()) {
-			ScanInterval i = iter.next();
-			if (i.getPluginName().equals(pluginName)) {
-				iter.remove();
-			}
+	public void removeIntervals() {
+//		Iterator<ScanInterval> iter = mIntervals.iterator();
+//		while(iter.hasNext()) {
+//			ScanInterval i = iter.next();
+//			if (i.getPluginName().equals(pluginName)) {
+//				iter.remove();
+//			}
+//		}
+		mIntervals = new ArrayList<ScanInterval>();
+		
+		if (mScanning) {
+			stopScanner();
+			startScanner();
 		}
 	}
 	
 	public void insertIntervals(ArrayList<ScanInterval> newInter) {
 		mIntervals.addAll(newInter);
 		sortScans();
+
+		if (mScanning) {
+			stopScanner();
+			startScanner();
+		}
 	}
 	
-	private void performScan() {
+	private void performScan(List<DeviceFoundCallback> callbacks) {
 		if (mBluetoothAdapter == null || !mBluetoothAdapter.isEnabled()) {
 			//Should we ask the user to enable BT?
 //			Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
@@ -220,7 +245,45 @@ public class BLEManager {
 	}
 	
 	private void scheduleNextScan() {
+		if (mIntervals.size() == 0) {
+			return;
+		}
 		
+		DateTime now = DateTime.now();
+		int weekDay = now.getDayOfWeek();
+		int nowMilis = now.getMillisOfDay();
+		
+		ArrayList<DeviceFoundCallback> callbacks = new ArrayList<DeviceFoundCallback>();
+		if (weekDay == SATURDAY || weekDay == SUNDAY) {
+			ScanInterval first = mIntervals.get(0);
+			callbacks.add(first.getCallback());
+			DateTime future = now.plusDays(weekDay == SATURDAY ? 2 : 1);
+			future = future.withMillisOfDay(first.getBegin());
+			mScanHandler.postDelayed(new RunnableScanner(callbacks), (long)
+					Math.abs(future.getMillis() - now.getMillis()));
+		} else {
+
+			for(ScanInterval i : mIntervals) {
+				int inInter;
+				try {
+					inInter = i.inInterval(now);
+				} catch (TimeIntervalException e) {
+					inInter = 1;
+				}
+
+				if (inInter == 0) {
+					callbacks.add(i.getCallback());
+				} else if (inInter > 0) {
+					if (callbacks.size() == 0) {
+						return;
+					} else {
+						mScanHandler.postDelayed(new RunnableScanner(callbacks),
+								/*Minimum restDuration*/0);
+					}
+				}
+			}
+		}
+
 		
 //		try {
 //			mScanJobHandler.postDelayed(mScanScheduler, durationToNextRushMilis());
@@ -236,13 +299,14 @@ public class BLEManager {
 	private Runnable mScanScheduler = new Runnable() {
 	    @Override 
 	    public void run() {
-	    	DateTime now = DateTime.now();
-	    	int weekDay = now.getDayOfWeek();
+//	    	DateTime now = DateTime.now();
+//	    	int weekDay = now.getDayOfWeek();
+//	    	
 	    	
-	    	if (weekDay != SUNDAY && duringRushHour(now)) {
-	    		performScan();
-	    	}
-	    	
+//	    	if (weekDay != SUNDAY && duringRushHour(now)) {
+//	    		performScan();
+//	    	}
+//	    	
 	    	scheduleNextScan();
 	    	
 	    	
@@ -253,23 +317,69 @@ public class BLEManager {
 	    }
 	  };
 	  
-	  private Runnable mScanner;
+	  private class RunnableScanner implements Runnable {
+		  
+		  private List<DeviceFoundCallback> mCallbacks;
+		  
+		  public RunnableScanner(List<DeviceFoundCallback> callbacks) {
+			  mCallbacks = callbacks;
+		  }
+
+		@Override
+		public void run() {
+			performScan(mCallbacks);
+		}
+		  
+	  }
+	  
+//	  private Runnable mScanner = new Runnable() {
+//
+//		  @Override
+//		  public void run() {
+//			  performScan();
+//		  }
+//	  };
+	  
+	  private Runnable mCallbackCaller;
+	  
+	  private class LeScanMultCallbacks implements BluetoothAdapter.LeScanCallback {
+		  
+		  private List<DeviceFoundCallback> mCallbacks;
+		  
+		  public LeScanMultCallbacks(List<DeviceFoundCallback> callbacks) {
+			  mCallbacks = callbacks;
+		  }
+
+		@Override
+		public void onLeScan(final BluetoothDevice device,
+				final int rssi, final byte[] scanRecord) {
+			mCallbackCaller = new Runnable() {
+  	          @Override
+  	          public void run() {
+  	        	  //TODO send the received name to the server.
+  	              Log.d("BLEManager DEBUG", "received name = " + device.getName());
+//  	              mUI.updateList(device);
+  	              for(DeviceFoundCallback cb: mCallbacks) {
+  	            	  cb.execute(device, rssi, scanRecord);
+  	              }
+  	          }
+  	      };
+  	      mCallbackCaller.run();
+			
+		}
+		  
+	  }
 	  
 	  
       private BluetoothAdapter.LeScanCallback mLeScanCallback =
     		  new BluetoothAdapter.LeScanCallback() {
+    	  
+    	  
+    	  
     	  @Override
     	  public void onLeScan(final BluetoothDevice device, int rssi,
     			  byte[] scanRecord) {
-    		  mScanner = new Runnable() {
-    	          @Override
-    	          public void run() {
-    	        	  //TODO send the received name to the server.
-    	              Log.d("BLEManager DEBUG", "received name = " + device.getName());
-    	              mUI.updateList(device);
-    	          }
-    	      };
-    	      mScanner.run();
+    		  
     	  }
       };
 

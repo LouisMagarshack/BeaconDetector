@@ -11,7 +11,7 @@ public class ScanInterval /*<T>*/ {
 	
 	//This can be used to remove intervals from the list.
 	//It is important that it should not be respected.
-	private String mPluginName;
+//	private String mPluginName;
 	
 	
 	
@@ -20,33 +20,37 @@ public class ScanInterval /*<T>*/ {
 		mInterval = interval;
 		mFrequency = frequency;
 		mCallback = cb;
-		mPluginName = pluginName;
+//		mPluginName = pluginName;
 		
 	}
 	
-	public long inInterval(DateTime time) throws TimeIntervalException {
+	public int inInterval(DateTime time) throws TimeIntervalException {
 		return mInterval.inInterval(time);
 	}
 	
-	public long getBegin() {
+	public int getBegin() {
 		return mInterval.getBegin();
 	}
 	
-	public long getScanDuration() {
+	public int getScanDuration() {
 		return mFrequency.getScanDuration();
 	}
 	
-	public long getRestDuration() {
+	public int getRestDuration() {
 		return mFrequency.getRestDuration();
 	}
 	
-	public void executeCallback(final BluetoothDevice device, int rssi,
-			  byte[] scanRecord) {
-		mCallback.execute(device, rssi, scanRecord);
+//	public void executeCallback(final BluetoothDevice device, int rssi,
+//			  byte[] scanRecord) {
+//		mCallback.execute(device, rssi, scanRecord);
+//	}
+	
+	public DeviceFoundCallback getCallback() {
+		return mCallback;
 	}
 	
-	public String getPluginName() {
-		return mPluginName;
-	}
+//	public String getPluginName() {
+//		return mPluginName;
+//	}
 
 }

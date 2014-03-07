@@ -5,8 +5,8 @@ import org.joda.time.DateTime;
 public class TimeInterval {
 	//We could also specify days of the week in this class.
 	
-	private long mBegin;
-	private long mEnd;
+	private int mBegin;
+	private int mEnd;
 	
 	public TimeInterval(String begin, String end) {
 		//TODO check that the parsing goes well.
@@ -22,12 +22,12 @@ public class TimeInterval {
 	 * A positive number representing the number of milis after the interval.
 	 * @throws TimeIntervalException If the given time is null.
 	 */
-	public long inInterval(DateTime time) throws TimeIntervalException {
+	public int inInterval(DateTime time) throws TimeIntervalException {
 		if (time == null) {
 			throw new TimeIntervalException("TimeInterval was given a null time");
 		}
 		
-		long timeInMilis = time.getMillisOfDay();
+		int timeInMilis = time.getMillisOfDay();
 		
 		if (timeInMilis < mBegin) {
 			//Return a negative # when before the interval
@@ -42,7 +42,7 @@ public class TimeInterval {
 		
 	}
 	
-	public long getBegin() {
+	public int getBegin() {
 		return mBegin;
 	}
 }

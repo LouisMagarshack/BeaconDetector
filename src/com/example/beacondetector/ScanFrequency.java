@@ -4,11 +4,11 @@ public class ScanFrequency {
 	
 	private final static long HOUR_MS = 60 * 60 * 1000;
 	
-	private long mScanDuration;
+	private int mScanDuration;
 	
-	private long mRestDuration;
+	private int mRestDuration;
 	
-	public ScanFrequency(long upms, long scanDuration) throws ScanFrequencyException {
+	public ScanFrequency(int upms, int scanDuration) throws ScanFrequencyException {
 		if (upms <= 0 || upms > HOUR_MS ||
 				scanDuration <= 0 || scanDuration > HOUR_MS ||
 				scanDuration > upms) {
@@ -40,18 +40,18 @@ public class ScanFrequency {
 		} else {
 			double totalRestDuration = ((double) HOUR_MS) - totalScanDuration;
 			
-			mRestDuration = (long) Math.floor(totalRestDuration / nbRests);
+			mRestDuration = (int) Math.floor(totalRestDuration / nbRests);
 
 		}	
 		
 		
 	}
 	
-	public long getScanDuration() {
+	public int getScanDuration() {
 		return mScanDuration;
 	}
 	
-	public long getRestDuration() {
+	public int getRestDuration() {
 		return mRestDuration;
 	}
 }
