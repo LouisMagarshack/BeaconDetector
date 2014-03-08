@@ -1,6 +1,7 @@
 package com.example.beacondetector;
 
 import org.joda.time.DateTime;
+import org.joda.time.format.ISODateTimeFormat;
 
 public class TimeInterval {
 	//We could also specify days of the week in this class.
@@ -10,8 +11,10 @@ public class TimeInterval {
 	
 	public TimeInterval(String begin, String end) {
 		//TODO check that the parsing goes well.
-		mBegin = DateTime.parse(begin).getMillisOfDay();
-		mEnd = DateTime.parse(end).getMillisOfDay();
+		mBegin = DateTime.parse(begin,
+				ISODateTimeFormat.timeParser()).getMillisOfDay();
+		mEnd = DateTime.parse(end,
+				ISODateTimeFormat.timeParser()).getMillisOfDay();
 	}
 	
 	/**

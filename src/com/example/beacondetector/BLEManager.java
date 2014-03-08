@@ -3,7 +3,7 @@ package com.example.beacondetector;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 
 import org.joda.time.DateTime;
@@ -16,7 +16,6 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Handler;
-import android.provider.CallLog.Calls;
 import android.util.Log;
 
 @TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR2)
@@ -33,7 +32,8 @@ public class BLEManager {
 	//Careful with concurrency!
 	
 	
-	private final int SATURDAY = 6;
+	//TODO saturday is 6, this is for testing.
+	private final int SATURDAY = 1;
 	
 	private final int SUNDAY = 0;
 	
@@ -48,7 +48,7 @@ public class BLEManager {
 	
 //	private final int SCAN_INTERVAL = 1000 /* 60 */ * 10; //10 minutes
 	
-	private final int SCAN_DURATION = 1000 * 10; //10 seconds
+//	private final int SCAN_DURATION = 1000 * 10; //10 seconds
 	
 //	private Handler mScanJobHandler = new Handler();
 	
@@ -89,6 +89,8 @@ public class BLEManager {
 			(BluetoothManager) ctx.getSystemService(Context.BLUETOOTH_SERVICE);
 
 		mBluetoothAdapter = mBluetoothManager == null ? null : mBluetoothManager.getAdapter();
+		
+		mIntervals = new ArrayList<ScanInterval>();
 		
 	}
 	
@@ -148,7 +150,8 @@ public class BLEManager {
 		}
 	}
 	
-	private void performScan(List<DeviceFoundCallback> callbacks) {
+	private void performScan(List<ScanInterval> inter) {
+		Log.d("BLEManager DEBUG", "Call perform scan");
 		if (mBluetoothAdapter == null || !mBluetoothAdapter.isEnabled()) {
 			//Should we ask the user to enable BT?
 //			Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
@@ -156,14 +159,29 @@ public class BLEManager {
 			Log.d("BLEManager DEBUG", "BT is turned off");
 			return;
 		}
+		
+		int max = 0;
+		List<DeviceFoundCallback> callbacks = new LinkedList<DeviceFoundCallback>();
+        for (ScanInterval i: inter) {
+        	callbacks.add(i.getCallback());
+        	if (i.getScanDuration() > max) {
+        		max = i.getScanDuration();
+        	}
+        }
+        
+        Log.d("BLEManager DEBUG", "scanDuration = " + max);
+        
+        final LeScanMultCallbacks callback = new LeScanMultCallbacks(callbacks);
+		
 		mScanHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
-                mBluetoothAdapter.stopLeScan(mLeScanCallback);
+                mBluetoothAdapter.stopLeScan(callback);
+                mScanScheduler.run();
             }
-        }, SCAN_DURATION);
+        }, max);
 		
-        mBluetoothAdapter.startLeScan(mLeScanCallback);
+        mBluetoothAdapter.startLeScan(callback);
 		
 		
 	}
@@ -246,23 +264,27 @@ public class BLEManager {
 	
 	private void scheduleNextScan() {
 		if (mIntervals.size() == 0) {
+			Log.d("BLEManager DEBUG", "Not scan Intervals");
 			return;
 		}
 		
 		DateTime now = DateTime.now();
 		int weekDay = now.getDayOfWeek();
-		int nowMilis = now.getMillisOfDay();
+//		int nowMilis = now.getMillisOfDay();
 		
-		ArrayList<DeviceFoundCallback> callbacks = new ArrayList<DeviceFoundCallback>();
+		ArrayList<ScanInterval> subSet = new ArrayList<ScanInterval>();
 		if (weekDay == SATURDAY || weekDay == SUNDAY) {
+			Log.d("BLEManager DEBUG", "No scans on weekends");
 			ScanInterval first = mIntervals.get(0);
-			callbacks.add(first.getCallback());
+			subSet.add(first);
 			DateTime future = now.plusDays(weekDay == SATURDAY ? 2 : 1);
 			future = future.withMillisOfDay(first.getBegin());
-			mScanHandler.postDelayed(new RunnableScanner(callbacks), (long)
+			mScanHandler.postDelayed(new RunnableScanner(subSet), (long)
 					Math.abs(future.getMillis() - now.getMillis()));
+			return;
 		} else {
-
+			int min = 60 * 60 * 1000;
+			
 			for(ScanInterval i : mIntervals) {
 				int inInter;
 				try {
@@ -272,14 +294,32 @@ public class BLEManager {
 				}
 
 				if (inInter == 0) {
-					callbacks.add(i.getCallback());
+					Log.d("BLEManager DEBUG", "Now in interval");
+					if (i.getRestDuration() < min) {
+						min = i.getRestDuration();
+					}
+					subSet.add(i);
 				} else if (inInter > 0) {
-					if (callbacks.size() == 0) {
+					Log.d("BLEManager DEBUG", "Now in interval");
+					if (subSet.size() == 0) {
+						subSet.add(i);
+						Log.d("BLEManager DEBUG", "rest = " 
+						+ (long) Math.abs(i.getBegin() - now.getMillisOfDay()));
+						mScanHandler.postDelayed(new RunnableScanner(subSet),
+								(long) Math.abs(i.getBegin() - now.getMillisOfDay()));
 						return;
 					} else {
-						mScanHandler.postDelayed(new RunnableScanner(callbacks),
-								/*Minimum restDuration*/0);
+						Log.d("BLEManager DEBUG", "rest = " + min);
+						mScanHandler.postDelayed(new RunnableScanner(subSet),
+								min);
+						return;
 					}
+				}
+				if (subSet.size() != 0) {
+					Log.d("BLEManager DEBUG", "rest = " + min);
+					mScanHandler.postDelayed(new RunnableScanner(subSet),
+							min);
+					return;
 				}
 			}
 		}
@@ -306,7 +346,8 @@ public class BLEManager {
 //	    	if (weekDay != SUNDAY && duringRushHour(now)) {
 //	    		performScan();
 //	    	}
-//	    	
+	    	
+	    	Log.d("BLEManager DEBUG", "Starting Scheduler");
 	    	scheduleNextScan();
 	    	
 	    	
@@ -319,15 +360,15 @@ public class BLEManager {
 	  
 	  private class RunnableScanner implements Runnable {
 		  
-		  private List<DeviceFoundCallback> mCallbacks;
+		  private List<ScanInterval> mScans;
 		  
-		  public RunnableScanner(List<DeviceFoundCallback> callbacks) {
-			  mCallbacks = callbacks;
+		  public RunnableScanner(List<ScanInterval> intervals) {
+			  mScans = intervals;
 		  }
 
 		@Override
 		public void run() {
-			performScan(mCallbacks);
+			performScan(mScans);
 		}
 		  
 	  }

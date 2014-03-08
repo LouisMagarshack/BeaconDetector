@@ -16,7 +16,7 @@ public class ScanInterval /*<T>*/ {
 	
 	
 	public ScanInterval(TimeInterval interval, ScanFrequency frequency,
-			DeviceFoundCallback cb, String pluginName) {
+			DeviceFoundCallback cb) {
 		mInterval = interval;
 		mFrequency = frequency;
 		mCallback = cb;

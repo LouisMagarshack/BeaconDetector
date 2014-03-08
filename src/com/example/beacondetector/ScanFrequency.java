@@ -1,5 +1,7 @@
 package com.example.beacondetector;
 
+import android.util.Log;
+
 public class ScanFrequency {
 	
 	private final static long HOUR_MS = 60 * 60 * 1000;
@@ -20,6 +22,7 @@ public class ScanFrequency {
 		
 		//Compute corresponding rest duration.
 		double nbScans =  Math.ceil(((double) upms) / ((double) mScanDuration));
+		
 		
 		double totalScanDuration = nbScans * ((double) mScanDuration);
 		
@@ -44,7 +47,7 @@ public class ScanFrequency {
 
 		}	
 		
-		
+		Log.d("ScanFrequency DEBUG", "restDuration = " + mRestDuration);
 	}
 	
 	public int getScanDuration() {

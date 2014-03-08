@@ -1,5 +1,7 @@
 package com.example.beacondetector;
 
+import java.util.ArrayList;
+
 import android.app.Activity;
 import android.bluetooth.BluetoothDevice;
 import android.os.Bundle;
@@ -30,6 +32,26 @@ public class MainActivity extends Activity {
 		mBLEManager = new BLEManager(this);
 		
 		mBLEManager.startScanner();
+		
+		try {
+			ScanInterval myInt = new ScanInterval(
+					new TimeInterval("8:00:00", "12:00:00"),
+					new ScanFrequency(1800000, 5000),
+					new DeviceFoundCallback() {
+						
+						@Override
+						public void execute(BluetoothDevice device, int rssi, byte[] scanRecord) {
+							updateList(device);
+						}
+					});
+			ArrayList<ScanInterval> list = new ArrayList<ScanInterval>();
+			list.add(myInt);
+			mBLEManager.insertIntervals(list);
+			
+		} catch (ScanFrequencyException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		
 		
 	}
